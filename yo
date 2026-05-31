@@ -1,6 +1,7 @@
 -- ===============================================
--- ICE FINDER v49 - CLEANED & RESPONSIVE UI
--- Original logic preserved, visuals modernized
+-- ICE FINDER v49 - CLEANED UI (ORIGINAL STRUCTURE PRESERVED)
+-- Original: https://pastefy.app/qNACaYgK/raw
+-- WARNING: This is a Roblox exploit script. Using it can result in permanent ban!
 -- ===============================================
 
 -- Services
@@ -11,7 +12,6 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
-local TextService = game:GetService("TextService")
 
 -- Local Player
 local LocalPlayer = Players.LocalPlayer
@@ -37,7 +37,7 @@ local ShowFPS = true
 local ShowPing = true
 local AntiLag = true
 
--- Blacklist and Auto-Force Lists
+-- Blacklist and Auto-Force Lists (hardcoded pet names)
 local BlacklistPets = {
     "Brainrot God", "Secret", "OG", "Alessio", "Gattatino Neonino", "Chihuanini Taconini",
     "Corn Corn Corn Sahur", "Espresso Signora", "Dug dug dug", "Frio Ninja", "Los Bombinitos",
@@ -66,7 +66,7 @@ local function UpdateFPS()
         lastTime = currentTime
         return fps
     end
-    return nil
+    return 0
 end
 
 local function UpdatePing()
@@ -75,146 +75,136 @@ local function UpdatePing()
     return math.floor(currentPing * 1000)
 end
 
--- Theme
-local Theme = {
-    BG = Color3.fromRGB(30, 30, 35),
-    Surface = Color3.fromRGB(40, 40, 48),
-    Elevated = Color3.fromRGB(50, 50, 60),
-    Accent = Color3.fromRGB(88, 101, 242),
-    AccentLight = Color3.fromRGB(108, 121, 255),
-    Green = Color3.fromRGB(59, 165, 93),
-    Red = Color3.fromRGB(237, 66, 69),
-    Yellow = Color3.fromRGB(250, 168, 26),
-    White = Color3.fromRGB(255, 255, 255),
-    Gray = Color3.fromRGB(180, 180, 190),
-    DarkGray = Color3.fromRGB(120, 120, 130),
-    Border = Color3.fromRGB(60, 60, 70)
-}
-
--- UI Helpers
-local function Corner(parent, r)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r or 8)
-    c.Parent = parent
-    return c
+-- UI Creation Functions
+local function CreateCorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 8)
+    corner.Parent = parent
+    return corner
 end
 
-local function Stroke(parent, col, thick)
-    local s = Instance.new("UIStroke")
-    s.Color = col or Theme.Border
-    s.Thickness = thick or 1
-    s.Parent = parent
-    return s
+local function CreateGradient(parent, color1, color2)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, color1),
+        ColorSequenceKeypoint.new(1, color2)
+    }
+    gradient.Rotation = 45
+    gradient.Parent = parent
+    return gradient
 end
 
-local function Tween(obj, props, dur, style, dir)
-    TweenService:Create(obj, TweenInfo.new(dur or 0.3, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props):Play()
+local function CreateStroke(parent, color, thickness)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = thickness or 1
+    stroke.Parent = parent
+    return stroke
 end
 
--- Responsive sizing
-local function GetScreenSize()
-    return workspace.CurrentCamera.ViewportSize
+local function TweenObject(object, properties, duration, easingStyle, easingDirection)
+    local tween = TweenService:Create(object, TweenInfo.new(duration or 0.3, easingStyle or Enum.EasingStyle.Quad, easingDirection or Enum.EasingDirection.Out), properties)
+    tween:Play()
+    return tween
 end
 
-local function IsMobile()
-    local s = GetScreenSize()
-    return s.X < 700 or UserInputService.TouchEnabled
+-- Responsive sizing helper
+local function GetFrameSize()
+    local screenSize = workspace.CurrentCamera.ViewportSize
+    local isMobile = screenSize.X < 700 or UserInputService.TouchEnabled
+    local width = isMobile and math.min(480, screenSize.X - 20) or 500
+    local height = isMobile and math.min(380, screenSize.Y - 60) or 400
+    return width, height, isMobile
 end
 
--- Draggable
-local function MakeDrag(frame, handle)
-    local drag, input, start, pos = false, nil, nil, nil
+-- Draggable helper
+local function MakeDraggable(frame, handle)
+    local dragging = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
     handle = handle or frame
-    handle.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-            drag = true
-            start = inp.Position
-            pos = frame.Position
-            inp.Changed:Connect(function()
-                if inp.UserInputState == Enum.UserInputState.End then drag = false end
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
             end)
         end
     end)
-    handle.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
-            input = inp
+
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
         end
     end)
-    UserInputService.InputChanged:Connect(function(inp)
-        if inp == input and drag then
-            local delta = inp.Position - start
-            frame.Position = UDim2.new(pos.X.Scale, pos.X.Offset + delta.X, pos.Y.Scale, pos.Y.Offset + delta.Y)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
 
--- ============================================
--- MAIN GUI
--- ============================================
+-- Main ScreenGui Creation
 local function CreateMainGUI()
+    -- Destroy existing if any
     if ScreenGui then ScreenGui:Destroy() end
 
     ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "IceFinderUI_v49_Clean"
+    ScreenGui.Name = "IceFinderUI_v49_PerfectVisuals"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.Parent = gethui and gethui() or PlayerGui
 
-    local mobile = IsMobile()
-    local sw, sh = GetScreenSize().X, GetScreenSize().Y
-    local fw = math.min(520, sw - 20)
-    local fh = math.min(420, sh - 60)
+    local fw, fh, isMobile = GetFrameSize()
 
-    -- Overlay Stats
+    -- Overlay Stats (FPS/Ping)
     if ShowFPS or ShowPing then
         OverlayStats = Instance.new("Frame")
         OverlayStats.Name = "OverlayStats"
-        OverlayStats.Size = UDim2.new(0, 180, 0, 34)
-        OverlayStats.Position = UDim2.new(1, -190, 0, 10)
-        OverlayStats.BackgroundColor3 = Theme.Surface
+        OverlayStats.Size = UDim2.new(0, 200, 0, 30)
+        OverlayStats.Position = UDim2.new(0, 10, 0, 10)
+        OverlayStats.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+        OverlayStats.BackgroundTransparency = 0.2
         OverlayStats.BorderSizePixel = 0
         OverlayStats.Parent = ScreenGui
-        Corner(OverlayStats, 8)
-        Stroke(OverlayStats)
 
-        local pad = Instance.new("UIPadding")
-        pad.PaddingLeft = UDim.new(0, 10)
-        pad.PaddingRight = UDim.new(0, 10)
-        pad.Parent = OverlayStats
+        CreateCorner(OverlayStats, 6)
+        CreateStroke(OverlayStats, Color3.fromRGB(80, 80, 90), 1)
 
-        local list = Instance.new("UIListLayout")
-        list.FillDirection = Enum.FillDirection.Horizontal
-        list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        list.VerticalAlignment = Enum.VerticalAlignment.Center
-        list.SortOrder = Enum.SortOrder.LayoutOrder
-        list.Padding = UDim.new(0, 10)
-        list.Parent = OverlayStats
+        local FPSLabel = Instance.new("TextLabel")
+        FPSLabel.Name = "FPSLabel"
+        FPSLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        FPSLabel.Position = UDim2.new(0, 0, 0, 0)
+        FPSLabel.BackgroundTransparency = 1
+        FPSLabel.Text = "FPS: 0"
+        FPSLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
+        FPSLabel.TextScaled = false
+        FPSLabel.TextSize = 13
+        FPSLabel.Font = Enum.Font.GothamBold
+        FPSLabel.Parent = OverlayStats
 
-        if ShowFPS then
-            local FPSLabel = Instance.new("TextLabel")
-            FPSLabel.Name = "FPSLabel"
-            FPSLabel.Size = UDim2.new(0.5, -5, 1, 0)
-            FPSLabel.BackgroundTransparency = 1
-            FPSLabel.Text = "FPS: 0"
-            FPSLabel.TextColor3 = Theme.Green
-            FPSLabel.TextScaled = false
-            FPSLabel.TextSize = 13
-            FPSLabel.Font = Enum.Font.GothamBold
-            FPSLabel.Parent = OverlayStats
-        end
-
-        if ShowPing then
-            local PingLabel = Instance.new("TextLabel")
-            PingLabel.Name = "PingLabel"
-            PingLabel.Size = UDim2.new(0.5, -5, 1, 0)
-            PingLabel.BackgroundTransparency = 1
-            PingLabel.Text = "Ping: 0ms"
-            PingLabel.TextColor3 = Theme.Accent
-            PingLabel.TextScaled = false
-            PingLabel.TextSize = 13
-            PingLabel.Font = Enum.Font.GothamBold
-            PingLabel.Parent = OverlayStats
-        end
+        local PingLabel = Instance.new("TextLabel")
+        PingLabel.Name = "PingLabel"
+        PingLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        PingLabel.Position = UDim2.new(0.5, 0, 0, 0)
+        PingLabel.BackgroundTransparency = 1
+        PingLabel.Text = "Ping: 0ms"
+        PingLabel.TextColor3 = Color3.fromRGB(100, 150, 255)
+        PingLabel.TextScaled = false
+        PingLabel.TextSize = 13
+        PingLabel.Font = Enum.Font.GothamBold
+        PingLabel.Parent = OverlayStats
     end
 
     -- Main Frame
@@ -222,453 +212,414 @@ local function CreateMainGUI()
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, fw, 0, fh)
     MainFrame.Position = UDim2.new(0.5, -fw/2, 0.5, -fh/2)
-    MainFrame.BackgroundColor3 = Theme.BG
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
     MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = true
-    Corner(MainFrame, 12)
-    Stroke(MainFrame)
+    MainFrame.ClipsDescendants = true
 
-    -- Shadow
-    local shadow = Instance.new("ImageLabel")
-    shadow.Name = "Shadow"
-    shadow.Size = UDim2.new(1, 30, 1, 30)
-    shadow.Position = UDim2.new(0, -15, 0, -15)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://5554236805"
-    shadow.ImageColor3 = Color3.fromRGB(0,0,0)
-    shadow.ImageTransparency = 0.6
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(23,23,277,277)
-    shadow.ZIndex = 0
-    shadow.Parent = MainFrame
-
-    -- Title Bar
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Name = "TitleBar"
-    TitleBar.Size = UDim2.new(1, 0, 0, 44)
-    TitleBar.BackgroundColor3 = Theme.Surface
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = MainFrame
-    Corner(TitleBar, 12)
-
-    -- Fix bottom corners of title bar
-    local fix = Instance.new("Frame")
-    fix.Size = UDim2.new(1, 0, 0, 12)
-    fix.Position = UDim2.new(0, 0, 1, -12)
-    fix.BackgroundColor3 = Theme.Surface
-    fix.BorderSizePixel = 0
-    fix.Parent = TitleBar
+    CreateCorner(MainFrame, 12)
+    CreateStroke(MainFrame, Color3.fromRGB(60, 60, 75), 1)
 
     -- Title
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Name = "TitleLabel"
-    TitleLabel.Size = UDim2.new(1, -140, 0, 44)
-    TitleLabel.Position = UDim2.new(0, 14, 0, 0)
+    TitleLabel.Size = UDim2.new(1, -60, 0, 30)
+    TitleLabel.Position = UDim2.new(0, 12, 0, 6)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "❄ Ice Finder v49"
-    TitleLabel.TextColor3 = Theme.White
+    TitleLabel.Text = "Ice Finder v49"
+    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleLabel.TextScaled = false
     TitleLabel.TextSize = 16
     TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = TitleBar
+    TitleLabel.Parent = MainFrame
 
     -- Filter Button
     local FilterButton = Instance.new("TextButton")
     FilterButton.Name = "FilterButton"
-    FilterButton.Size = UDim2.new(0, 70, 0, 30)
-    FilterButton.Position = UDim2.new(1, -110, 0, 7)
-    FilterButton.BackgroundColor3 = Theme.Accent
+    FilterButton.Size = UDim2.new(0, 80, 0, 26)
+    FilterButton.Position = UDim2.new(1, -96, 0, 8)
+    FilterButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
     FilterButton.Text = "Filter"
-    FilterButton.TextColor3 = Theme.White
+    FilterButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     FilterButton.TextScaled = false
     FilterButton.TextSize = 13
     FilterButton.Font = Enum.Font.GothamBold
     FilterButton.AutoButtonColor = false
-    FilterButton.Parent = TitleBar
-    Corner(FilterButton, 6)
+    FilterButton.Parent = MainFrame
 
-    FilterButton.MouseEnter:Connect(function()
-        Tween(FilterButton, {BackgroundColor3 = Theme.AccentLight}, 0.2)
-    end)
-    FilterButton.MouseLeave:Connect(function()
-        Tween(FilterButton, {BackgroundColor3 = Theme.Accent}, 0.2)
-    end)
+    CreateCorner(FilterButton, 6)
+    CreateGradient(FilterButton, Color3.fromRGB(0, 100, 220), Color3.fromRGB(0, 140, 255))
 
     -- Close Button
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "CloseButton"
-    CloseButton.Size = UDim2.new(0, 30, 0, 30)
-    CloseButton.Position = UDim2.new(1, -36, 0, 7)
-    CloseButton.BackgroundColor3 = Theme.Red
+    CloseButton.Size = UDim2.new(0, 26, 0, 26)
+    CloseButton.Position = UDim2.new(1, -32, 0, 8)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(237, 66, 69)
     CloseButton.Text = "X"
-    CloseButton.TextColor3 = Theme.White
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseButton.TextScaled = false
     CloseButton.TextSize = 14
     CloseButton.Font = Enum.Font.GothamBold
     CloseButton.AutoButtonColor = false
-    CloseButton.Parent = TitleBar
-    Corner(CloseButton, 6)
+    CloseButton.Parent = MainFrame
+
+    CreateCorner(CloseButton, 6)
 
     -- Minimize Button
     local MinimizeButton = Instance.new("TextButton")
     MinimizeButton.Name = "MinimizeButton"
-    MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
-    MinimizeButton.Position = UDim2.new(1, -70, 0, 7)
-    MinimizeButton.BackgroundColor3 = Theme.Yellow
-    MinimizeButton.Text = "−"
-    MinimizeButton.TextColor3 = Color3.fromRGB(0,0,0)
+    MinimizeButton.Size = UDim2.new(0, 26, 0, 26)
+    MinimizeButton.Position = UDim2.new(1, -62, 0, 8)
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(250, 168, 26)
+    MinimizeButton.Text = "-"
+    MinimizeButton.TextColor3 = Color3.fromRGB(0, 0, 0)
     MinimizeButton.TextScaled = false
     MinimizeButton.TextSize = 16
     MinimizeButton.Font = Enum.Font.GothamBold
     MinimizeButton.AutoButtonColor = false
-    MinimizeButton.Parent = TitleBar
-    Corner(MinimizeButton, 6)
+    MinimizeButton.Parent = MainFrame
 
-    -- Content
-    local Content = Instance.new("Frame")
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1, 0, 1, -44)
-    Content.Position = UDim2.new(0, 0, 0, 44)
-    Content.BackgroundTransparency = 1
-    Content.Parent = MainFrame
+    CreateCorner(MinimizeButton, 6)
 
-    local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, 10)
-    pad.PaddingBottom = UDim.new(0, 10)
-    pad.PaddingLeft = UDim.new(0, 12)
-    pad.PaddingRight = UDim.new(0, 12)
-    pad.Parent = Content
-
-    -- Log Frame
-    local LogFrame = Instance.new("Frame")
-    LogFrame.Name = "LogFrame"
-    LogFrame.Size = UDim2.new(1, 0, 1, 0)
-    LogFrame.BackgroundColor3 = Theme.Surface
-    LogFrame.BorderSizePixel = 0
-    LogFrame.Parent = Content
-    Corner(LogFrame, 10)
-    Stroke(LogFrame)
-
-    local logPad = Instance.new("UIPadding")
-    logPad.PaddingTop = UDim.new(0, 8)
-    logPad.PaddingBottom = UDim.new(0, 8)
-    logPad.PaddingLeft = UDim.new(0, 10)
-    logPad.PaddingRight = UDim.new(0, 10)
-    logPad.Parent = LogFrame
-
-    -- Log Header
-    local LogHeader = Instance.new("TextLabel")
-    LogHeader.Size = UDim2.new(1, 0, 0, 20)
-    LogHeader.BackgroundTransparency = 1
-    LogHeader.Text = "Activity Log"
-    LogHeader.TextColor3 = Theme.Gray
-    LogHeader.TextScaled = false
-    LogHeader.TextSize = 12
-    LogHeader.Font = Enum.Font.GothamBold
-    LogHeader.TextXAlignment = Enum.TextXAlignment.Left
-    LogHeader.Parent = LogFrame
-
-    -- Scrolling Log
+    -- Log Scrolling Frame
     LogScrollingFrame = Instance.new("ScrollingFrame")
     LogScrollingFrame.Name = "LogScrollingFrame"
-    LogScrollingFrame.Size = UDim2.new(1, 0, 1, -26)
-    LogScrollingFrame.Position = UDim2.new(0, 0, 0, 24)
-    LogScrollingFrame.BackgroundTransparency = 1
+    LogScrollingFrame.Size = UDim2.new(1, -24, 1, -52)
+    LogScrollingFrame.Position = UDim2.new(0, 12, 0, 42)
+    LogScrollingFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
     LogScrollingFrame.BorderSizePixel = 0
-    LogScrollingFrame.ScrollBarThickness = 4
-    LogScrollingFrame.ScrollBarImageColor3 = Theme.Accent
+    LogScrollingFrame.ScrollBarThickness = 5
+    LogScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
     LogScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
     LogScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    LogScrollingFrame.Parent = LogFrame
+    LogScrollingFrame.Parent = MainFrame
 
-    local logList = Instance.new("UIListLayout")
-    logList.SortOrder = Enum.SortOrder.LayoutOrder
-    logList.Padding = UDim.new(0, 4)
-    logList.HorizontalAlignment = Enum.HorizontalAlignment.Left
-    logList.Parent = LogScrollingFrame
+    CreateCorner(LogScrollingFrame, 8)
+    CreateStroke(LogScrollingFrame, Color3.fromRGB(40, 40, 50), 1)
 
-    -- Initial Log
-    AddLog("Ice Finder v49 Loaded Successfully!")
-    AddLog("Clean UI initialized")
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 8)
+    pad.PaddingBottom = UDim.new(0, 8)
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = LogScrollingFrame
 
-    MakeDrag(MainFrame, TitleBar)
+    local LogLayout = Instance.new("UIListLayout")
+    LogLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    LogLayout.Padding = UDim.new(0, 4)
+    LogLayout.Parent = LogScrollingFrame
 
-    -- Entrance
-    MainFrame.Size = UDim2.new(0, fw*0.9, 0, fh*0.9)
-    MainFrame.BackgroundTransparency = 0.1
-    Tween(MainFrame, {Size = UDim2.new(0, fw, 0, fh), BackgroundTransparency = 0}, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    -- Initial Log Message
+    local InitialLog = Instance.new("TextLabel")
+    InitialLog.Size = UDim2.new(1, 0, 0, 20)
+    InitialLog.BackgroundTransparency = 1
+    InitialLog.Text = "Ice Finder v49 Loaded Successfully!"
+    InitialLog.TextColor3 = Color3.fromRGB(0, 255, 128)
+    InitialLog.TextScaled = false
+    InitialLog.TextSize = 13
+    InitialLog.Font = Enum.Font.Gotham
+    InitialLog.TextXAlignment = Enum.TextXAlignment.Left
+    InitialLog.Parent = LogScrollingFrame
+
+    MakeDraggable(MainFrame)
 end
 
--- ============================================
--- FILTER FRAME
--- ============================================
+-- Filter Frame Creation
 local function CreateFilterFrame()
-    if FilterFrame and FilterFrame.Parent then
-        Tween(FilterFrame, {Position = UDim2.new(0.5, 260, 0.5, -175)}, 0.3)
-        return
-    end
+    if FilterFrame then FilterFrame:Destroy() end
 
-    local mobile = IsMobile()
-    local sw, sh = GetScreenSize().X, GetScreenSize().Y
-    local fw = mobile and math.min(300, sw - 20) or 320
-    local fh = math.min(420, sh - 40)
+    local fw, fh, isMobile = GetFrameSize()
+    local filterW = isMobile and math.min(300, fw) or 300
+    local filterH = math.min(350, fh)
+    local posX = isMobile and 0.5 or 0.5
+    local posOffset = isMobile and -filterW/2 or 150
 
     FilterFrame = Instance.new("Frame")
     FilterFrame.Name = "FilterFrame"
-    FilterFrame.Size = UDim2.new(0, fw, 0, fh)
-    FilterFrame.Position = UDim2.new(0.5, mobile and -fw/2 or 260, 0.5, -fh/2)
-    FilterFrame.BackgroundColor3 = Theme.BG
+    FilterFrame.Size = UDim2.new(0, filterW, 0, filterH)
+    FilterFrame.Position = UDim2.new(posX, posOffset, 0.5, -filterH/2)
+    FilterFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
     FilterFrame.BorderSizePixel = 0
-    FilterFrame.ClipsDescendants = true
     FilterFrame.Parent = ScreenGui
-    FilterFrame.ZIndex = 10
-    Corner(FilterFrame, 12)
-    Stroke(FilterFrame)
+    FilterFrame.ClipsDescendants = true
 
-    local shadow = Instance.new("ImageLabel")
-    shadow.Size = UDim2.new(1, 30, 1, 30)
-    shadow.Position = UDim2.new(0, -15, 0, -15)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://5554236805"
-    shadow.ImageColor3 = Color3.fromRGB(0,0,0)
-    shadow.ImageTransparency = 0.6
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(23,23,277,277)
-    shadow.ZIndex = 0
-    shadow.Parent = FilterFrame
+    CreateCorner(FilterFrame, 12)
+    CreateStroke(FilterFrame, Color3.fromRGB(60, 60, 75), 1)
 
-    -- Header
-    local FTitleBar = Instance.new("Frame")
-    FTitleBar.Size = UDim2.new(1, 0, 0, 40)
-    FTitleBar.BackgroundColor3 = Theme.Surface
-    FTitleBar.BorderSizePixel = 0
-    FTitleBar.Parent = FilterFrame
-    Corner(FTitleBar, 12)
+    -- Title
+    local FilterTitle = Instance.new("TextLabel")
+    FilterTitle.Size = UDim2.new(1, -40, 0, 30)
+    FilterTitle.Position = UDim2.new(0, 12, 0, 6)
+    FilterTitle.BackgroundTransparency = 1
+    FilterTitle.Text = "Filters"
+    FilterTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FilterTitle.TextScaled = false
+    FilterTitle.TextSize = 16
+    FilterTitle.Font = Enum.Font.GothamBold
+    FilterTitle.Parent = FilterFrame
 
-    local fix = Instance.new("Frame")
-    fix.Size = UDim2.new(1, 0, 0, 12)
-    fix.Position = UDim2.new(0, 0, 1, -12)
-    fix.BackgroundColor3 = Theme.Surface
-    fix.BorderSizePixel = 0
-    fix.Parent = FTitleBar
-
-    local FTitle = Instance.new("TextLabel")
-    FTitle.Size = UDim2.new(1, -50, 0, 40)
-    FTitle.Position = UDim2.new(0, 14, 0, 0)
-    FTitle.BackgroundTransparency = 1
-    FTitle.Text = "Filters"
-    FTitle.TextColor3 = Theme.White
-    FTitle.TextScaled = false
-    FTitle.TextSize = 16
-    FTitle.Font = Enum.Font.GothamBold
-    FTitle.TextXAlignment = Enum.TextXAlignment.Left
-    FTitle.Parent = FTitleBar
-
+    -- Close Filter Button
     local CloseFilterButton = Instance.new("TextButton")
-    CloseFilterButton.Name = "CloseFilterButton"
-    CloseFilterButton.Size = UDim2.new(0, 28, 0, 28)
-    CloseFilterButton.Position = UDim2.new(1, -34, 0, 6)
-    CloseFilterButton.BackgroundColor3 = Theme.Red
+    CloseFilterButton.Size = UDim2.new(0, 26, 0, 26)
+    CloseFilterButton.Position = UDim2.new(1, -32, 0, 8)
+    CloseFilterButton.BackgroundColor3 = Color3.fromRGB(237, 66, 69)
     CloseFilterButton.Text = "X"
-    CloseFilterButton.TextColor3 = Theme.White
+    CloseFilterButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseFilterButton.TextScaled = false
-    CloseFilterButton.TextSize = 13
+    CloseFilterButton.TextSize = 14
     CloseFilterButton.Font = Enum.Font.GothamBold
     CloseFilterButton.AutoButtonColor = false
-    CloseFilterButton.Parent = FTitleBar
-    Corner(CloseFilterButton, 6)
+    CloseFilterButton.Parent = FilterFrame
 
-    -- Scroll Content
+    CreateCorner(CloseFilterButton, 6)
+
+    -- Scrollable content
     local Scroll = Instance.new("ScrollingFrame")
     Scroll.Size = UDim2.new(1, 0, 1, -40)
     Scroll.Position = UDim2.new(0, 0, 0, 40)
     Scroll.BackgroundTransparency = 1
     Scroll.BorderSizePixel = 0
     Scroll.ScrollBarThickness = 4
-    Scroll.ScrollBarImageColor3 = Theme.Accent
+    Scroll.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
     Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     Scroll.Parent = FilterFrame
 
     local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, 12)
-    pad.PaddingBottom = UDim.new(0, 12)
+    pad.PaddingTop = UDim.new(0, 10)
+    pad.PaddingBottom = UDim.new(0, 10)
     pad.PaddingLeft = UDim.new(0, 12)
     pad.PaddingRight = UDim.new(0, 12)
     pad.Parent = Scroll
 
     local list = Instance.new("UIListLayout")
     list.SortOrder = Enum.SortOrder.LayoutOrder
-    list.Padding = UDim.new(0, 10)
-    list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    list.Padding = UDim.new(0, 8)
     list.Parent = Scroll
 
-    -- Min Money
+    -- Min Money TextBox
     local MinMoneyLabel = Instance.new("TextLabel")
     MinMoneyLabel.Size = UDim2.new(1, 0, 0, 18)
     MinMoneyLabel.BackgroundTransparency = 1
     MinMoneyLabel.Text = "Min Money:"
-    MinMoneyLabel.TextColor3 = Theme.Gray
+    MinMoneyLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
     MinMoneyLabel.TextScaled = false
     MinMoneyLabel.TextSize = 13
     MinMoneyLabel.Font = Enum.Font.Gotham
-    MinMoneyLabel.TextXAlignment = Enum.TextXAlignment.Left
-    MinMoneyLabel.LayoutOrder = 0
     MinMoneyLabel.Parent = Scroll
 
     local MinMoneyBox = Instance.new("TextBox")
-    MinMoneyBox.Name = "MinMoneyBox"
-    MinMoneyBox.Size = UDim2.new(1, 0, 0, 36)
-    MinMoneyBox.BackgroundColor3 = Theme.Elevated
+    MinMoneyBox.Size = UDim2.new(1, 0, 0, 32)
+    MinMoneyBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     MinMoneyBox.Text = tostring(MinMoney)
-    MinMoneyBox.TextColor3 = Theme.White
+    MinMoneyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     MinMoneyBox.PlaceholderText = "Enter min money value"
-    MinMoneyBox.PlaceholderColor3 = Theme.DarkGray
+    MinMoneyBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
     MinMoneyBox.TextScaled = false
     MinMoneyBox.TextSize = 14
     MinMoneyBox.Font = Enum.Font.Gotham
     MinMoneyBox.ClearTextOnFocus = false
-    MinMoneyBox.LayoutOrder = 1
     MinMoneyBox.Parent = Scroll
-    Corner(MinMoneyBox, 6)
-    Stroke(MinMoneyBox)
 
-    MinMoneyBox.Focused:Connect(function()
-        Tween(MinMoneyBox, {BackgroundColor3 = Color3.fromRGB(60,60,70)}, 0.2)
-    end)
+    CreateCorner(MinMoneyBox, 6)
+    CreateStroke(MinMoneyBox, Color3.fromRGB(60, 60, 75), 1)
+
+    -- Toggle Buttons
+    local BlacklistToggle = Instance.new("TextButton")
+    BlacklistToggle.Size = UDim2.new(1, 0, 0, 36)
+    BlacklistToggle.BackgroundColor3 = ShowBlacklist and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    BlacklistToggle.Text = ShowBlacklist and "Blacklist: ON" or "Blacklist: OFF"
+    BlacklistToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    BlacklistToggle.TextScaled = false
+    BlacklistToggle.TextSize = 14
+    BlacklistToggle.Font = Enum.Font.GothamBold
+    BlacklistToggle.AutoButtonColor = false
+    BlacklistToggle.Parent = Scroll
+
+    CreateCorner(BlacklistToggle, 6)
+
+    -- Auto Force Toggle
+    local AutoForceToggle = Instance.new("TextButton")
+    AutoForceToggle.Size = UDim2.new(1, 0, 0, 36)
+    AutoForceToggle.BackgroundColor3 = ShowAutoForce and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    AutoForceToggle.Text = ShowAutoForce and "Auto-Force: ON" or "Auto-Force: OFF"
+    AutoForceToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AutoForceToggle.TextScaled = false
+    AutoForceToggle.TextSize = 14
+    AutoForceToggle.Font = Enum.Font.GothamBold
+    AutoForceToggle.AutoButtonColor = false
+    AutoForceToggle.Parent = Scroll
+
+    CreateCorner(AutoForceToggle, 6)
+
+    -- Auto Join Toggle
+    local AutoJoinToggle = Instance.new("TextButton")
+    AutoJoinToggle.Size = UDim2.new(1, 0, 0, 36)
+    AutoJoinToggle.BackgroundColor3 = AutoJoin and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    AutoJoinToggle.Text = AutoJoin and "Auto Join: ON" or "Auto Join: OFF"
+    AutoJoinToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AutoJoinToggle.TextScaled = false
+    AutoJoinToggle.TextSize = 14
+    AutoJoinToggle.Font = Enum.Font.GothamBold
+    AutoJoinToggle.AutoButtonColor = false
+    AutoJoinToggle.Parent = Scroll
+
+    CreateCorner(AutoJoinToggle, 6)
+
+    -- Tier Notifications Toggle
+    local TierNotifToggle = Instance.new("TextButton")
+    TierNotifToggle.Size = UDim2.new(1, 0, 0, 36)
+    TierNotifToggle.BackgroundColor3 = TierNotifications and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    TierNotifToggle.Text = TierNotifications and "Tier Notif: ON" or "Tier Notif: OFF"
+    TierNotifToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TierNotifToggle.TextScaled = false
+    TierNotifToggle.TextSize = 14
+    TierNotifToggle.Font = Enum.Font.GothamBold
+    TierNotifToggle.AutoButtonColor = false
+    TierNotifToggle.Parent = Scroll
+
+    CreateCorner(TierNotifToggle, 6)
+
+    -- Anti Lag Toggle
+    local AntiLagToggle = Instance.new("TextButton")
+    AntiLagToggle.Size = UDim2.new(1, 0, 0, 36)
+    AntiLagToggle.BackgroundColor3 = AntiLag and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    AntiLagToggle.Text = AntiLag and "Anti-Lag: ON" or "Anti-Lag: OFF"
+    AntiLagToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AntiLagToggle.TextScaled = false
+    AntiLagToggle.TextSize = 14
+    AntiLagToggle.Font = Enum.Font.GothamBold
+    AntiLagToggle.AutoButtonColor = false
+    AntiLagToggle.Parent = Scroll
+
+    CreateCorner(AntiLagToggle, 6)
+
+    -- Anti Error Toggle
+    local AntiErrorToggle = Instance.new("TextButton")
+    AntiErrorToggle.Size = UDim2.new(1, 0, 0, 36)
+    AntiErrorToggle.BackgroundColor3 = AntiError and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    AntiErrorToggle.Text = AntiError and "Anti-Error: ON" or "Anti-Error: OFF"
+    AntiErrorToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AntiErrorToggle.TextScaled = false
+    AntiErrorToggle.TextSize = 14
+    AntiErrorToggle.Font = Enum.Font.GothamBold
+    AntiErrorToggle.AutoButtonColor = false
+    AntiErrorToggle.Parent = Scroll
+
+    CreateCorner(AntiErrorToggle, 6)
+
+    -- Show FPS Toggle
+    local ShowFPSToggle = Instance.new("TextButton")
+    ShowFPSToggle.Size = UDim2.new(1, 0, 0, 36)
+    ShowFPSToggle.BackgroundColor3 = ShowFPS and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    ShowFPSToggle.Text = ShowFPS and "Show FPS: ON" or "Show FPS: OFF"
+    ShowFPSToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ShowFPSToggle.TextScaled = false
+    ShowFPSToggle.TextSize = 14
+    ShowFPSToggle.Font = Enum.Font.GothamBold
+    ShowFPSToggle.AutoButtonColor = false
+    ShowFPSToggle.Parent = Scroll
+
+    CreateCorner(ShowFPSToggle, 6)
+
+    -- Show Ping Toggle
+    local ShowPingToggle = Instance.new("TextButton")
+    ShowPingToggle.Size = UDim2.new(1, 0, 0, 36)
+    ShowPingToggle.BackgroundColor3 = ShowPing and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+    ShowPingToggle.Text = ShowPing and "Show Ping: ON" or "Show Ping: OFF"
+    ShowPingToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ShowPingToggle.TextScaled = false
+    ShowPingToggle.TextSize = 14
+    ShowPingToggle.Font = Enum.Font.GothamBold
+    ShowPingToggle.AutoButtonColor = false
+    ShowPingToggle.Parent = Scroll
+
+    CreateCorner(ShowPingToggle, 6)
+
+    -- Event Handlers
     MinMoneyBox.FocusLost:Connect(function(enterPressed)
-        Tween(MinMoneyBox, {BackgroundColor3 = Theme.Elevated}, 0.2)
         if enterPressed then
             MinMoney = tonumber(MinMoneyBox.Text) or 10
-            AddLog("Min Money set to: " .. MinMoney)
+            print("Min Money set to: " .. MinMoney)
         end
     end)
 
-    -- Toggle helper
-    local function MakeToggle(parent, text, state, callback, order)
-        local container = Instance.new("Frame")
-        container.Size = UDim2.new(1, 0, 0, 40)
-        container.BackgroundTransparency = 1
-        container.LayoutOrder = order
-        container.Parent = parent
+    BlacklistToggle.MouseButton1Click:Connect(function()
+        ShowBlacklist = not ShowBlacklist
+        BlacklistToggle.BackgroundColor3 = ShowBlacklist and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        BlacklistToggle.Text = ShowBlacklist and "Blacklist: ON" or "Blacklist: OFF"
+    end)
 
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, -60, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = text
-        label.TextColor3 = Theme.White
-        label.TextScaled = false
-        label.TextSize = 14
-        label.Font = Enum.Font.Gotham
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = container
+    AutoForceToggle.MouseButton1Click:Connect(function()
+        ShowAutoForce = not ShowAutoForce
+        AutoForceToggle.BackgroundColor3 = ShowAutoForce and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        AutoForceToggle.Text = ShowAutoForce and "Auto-Force: ON" or "Auto-Force: OFF"
+    end)
 
-        local bg = Instance.new("Frame")
-        bg.Size = UDim2.new(0, 46, 0, 24)
-        bg.Position = UDim2.new(1, -46, 0.5, -12)
-        bg.BackgroundColor3 = state and Theme.Green or Theme.Red
-        bg.BorderSizePixel = 0
-        bg.Parent = container
-        Corner(bg, 12)
+    AutoJoinToggle.MouseButton1Click:Connect(function()
+        AutoJoin = not AutoJoin
+        AutoJoinToggle.BackgroundColor3 = AutoJoin and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        AutoJoinToggle.Text = AutoJoin and "Auto Join: ON" or "Auto Join: OFF"
+    end)
 
-        local knob = Instance.new("Frame")
-        knob.Size = UDim2.new(0, 18, 0, 18)
-        knob.Position = state and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
-        knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        knob.BorderSizePixel = 0
-        knob.Parent = bg
-        Corner(knob, 9)
+    TierNotifToggle.MouseButton1Click:Connect(function()
+        TierNotifications = not TierNotifications
+        TierNotifToggle.BackgroundColor3 = TierNotifications and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        TierNotifToggle.Text = TierNotifications and "Tier Notif: ON" or "Tier Notif: OFF"
+    end)
 
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 1, 0)
-        btn.BackgroundTransparency = 1
-        btn.Text = ""
-        btn.Parent = container
+    AntiLagToggle.MouseButton1Click:Connect(function()
+        AntiLag = not AntiLag
+        AntiLagToggle.BackgroundColor3 = AntiLag and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        AntiLagToggle.Text = AntiLag and "Anti-Lag: ON" or "Anti-Lag: OFF"
+    end)
 
-        local current = state
-        btn.MouseButton1Click:Connect(function()
-            current = not current
-            local col = current and Theme.Green or Theme.Red
-            local pos = current and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
-            Tween(bg, {BackgroundColor3 = col}, 0.2)
-            Tween(knob, {Position = pos}, 0.2)
-            if callback then callback(current) end
-        end)
+    AntiErrorToggle.MouseButton1Click:Connect(function()
+        AntiError = not AntiError
+        AntiErrorToggle.BackgroundColor3 = AntiError and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        AntiErrorToggle.Text = AntiError and "Anti-Error: ON" or "Anti-Error: OFF"
+    end)
 
-        return container
-    end
+    ShowFPSToggle.MouseButton1Click:Connect(function()
+        ShowFPS = not ShowFPS
+        ShowFPSToggle.BackgroundColor3 = ShowFPS and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        ShowFPSToggle.Text = ShowFPS and "Show FPS: ON" or "Show FPS: OFF"
+        if OverlayStats then OverlayStats.Visible = ShowFPS or ShowPing end
+    end)
 
-    MakeToggle(Scroll, "Show Blacklist", ShowBlacklist, function(s)
-        ShowBlacklist = s
-        AddLog("Blacklist " .. (s and "enabled" or "disabled"))
-    end, 2)
+    ShowPingToggle.MouseButton1Click:Connect(function()
+        ShowPing = not ShowPing
+        ShowPingToggle.BackgroundColor3 = ShowPing and Color3.fromRGB(59, 165, 93) or Color3.fromRGB(237, 66, 69)
+        ShowPingToggle.Text = ShowPing and "Show Ping: ON" or "Show Ping: OFF"
+        if OverlayStats then OverlayStats.Visible = ShowFPS or ShowPing end
+    end)
 
-    MakeToggle(Scroll, "Show Auto-Force", ShowAutoForce, function(s)
-        ShowAutoForce = s
-        AddLog("Auto-Force " .. (s and "enabled" or "disabled"))
-    end, 3)
-
-    MakeToggle(Scroll, "Auto Join", AutoJoin, function(s)
-        AutoJoin = s
-        AddLog("Auto Join " .. (s and "enabled" or "disabled"))
-    end, 4)
-
-    MakeToggle(Scroll, "Tier Notifications", TierNotifications, function(s)
-        TierNotifications = s
-    end, 5)
-
-    MakeToggle(Scroll, "Anti-Lag", AntiLag, function(s)
-        AntiLag = s
-    end, 6)
-
-    MakeToggle(Scroll, "Anti-Error", AntiError, function(s)
-        AntiError = s
-    end, 7)
-
-    MakeToggle(Scroll, "Show FPS", ShowFPS, function(s)
-        ShowFPS = s
-        if OverlayStats then OverlayStats.Visible = s end
-    end, 8)
-
-    MakeToggle(Scroll, "Show Ping", ShowPing, function(s)
-        ShowPing = s
-    end, 9)
-
-    -- Close event
     CloseFilterButton.MouseButton1Click:Connect(function()
-        Tween(FilterFrame, {Position = UDim2.new(1, 20, FilterFrame.Position.Y.Scale, FilterFrame.Position.Y.Offset)}, 0.25)
-        wait(0.25)
-        if FilterFrame then FilterFrame:Destroy() end
+        FilterFrame:Destroy()
         FilterFrame = nil
     end)
 
-    MakeDrag(FilterFrame, FTitleBar)
-
-    -- Entrance
-    FilterFrame.Position = UDim2.new(FilterFrame.Position.X.Scale, FilterFrame.Position.X.Offset + 40, FilterFrame.Position.Y.Scale, FilterFrame.Position.Y.Offset)
-    Tween(FilterFrame, {Position = UDim2.new(FilterFrame.Position.X.Scale, FilterFrame.Position.X.Offset - 40, FilterFrame.Position.Y.Scale, FilterFrame.Position.Y.Offset)}, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    MakeDraggable(FilterFrame)
 end
 
--- ============================================
--- PET LIST
--- ============================================
+-- Pet List Creation (Blacklist)
 local function CreatePetList(parent, petList, isBlacklist)
     local ScrollingFrame = Instance.new("ScrollingFrame")
     ScrollingFrame.Name = isBlacklist and "BlacklistScrollingFrame" or "AutoForceScrollingFrame"
-    ScrollingFrame.Size = UDim2.new(1, 0, 1, -60)
-    ScrollingFrame.Position = UDim2.new(0, 0, 0, 48)
-    ScrollingFrame.BackgroundColor3 = Theme.Surface
+    ScrollingFrame.Size = UDim2.new(1, 0, 1, -80)
+    ScrollingFrame.Position = UDim2.new(0, 0, 0, 42)
+    ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
     ScrollingFrame.BorderSizePixel = 0
-    ScrollingFrame.ScrollBarThickness = 4
-    ScrollingFrame.ScrollBarImageColor3 = Theme.Accent
+    ScrollingFrame.ScrollBarThickness = 5
+    ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
     ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
     ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     ScrollingFrame.Parent = parent
-    Corner(ScrollingFrame, 8)
-    Stroke(ScrollingFrame)
+
+    CreateCorner(ScrollingFrame, 8)
+    CreateStroke(ScrollingFrame, Color3.fromRGB(40, 40, 50), 1)
 
     local pad = Instance.new("UIPadding")
     pad.PaddingTop = UDim.new(0, 8)
@@ -677,71 +628,56 @@ local function CreatePetList(parent, petList, isBlacklist)
     pad.PaddingRight = UDim.new(0, 8)
     pad.Parent = ScrollingFrame
 
-    local GridLayout = Instance.new("UIGridLayout")
-    GridLayout.CellSize = UDim2.new(0, 120, 0, 36)
-    GridLayout.CellPadding = UDim2.new(0, 6, 0, 6)
-    GridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    GridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    GridLayout.Parent = ScrollingFrame
+    local Layout = Instance.new("UIGridLayout")
+    Layout.CellSize = UDim2.new(0.3, -6, 0, 34)
+    Layout.CellPadding = UDim2.new(0, 6, 0, 6)
+    Layout.Parent = ScrollingFrame
 
-    -- Search Box (outside scroll, at top of parent)
     local SearchBox = Instance.new("TextBox")
-    SearchBox.Size = UDim2.new(1, -16, 0, 32)
-    SearchBox.Position = UDim2.new(0, 8, 0, 8)
-    SearchBox.BackgroundColor3 = Theme.Elevated
+    SearchBox.Size = UDim2.new(1, -16, 0, 30)
+    SearchBox.Position = UDim2.new(0, 8, 0, 6)
+    SearchBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     SearchBox.Text = ""
     SearchBox.PlaceholderText = "Search pets..."
-    SearchBox.PlaceholderColor3 = Theme.DarkGray
-    SearchBox.TextColor3 = Theme.White
+    SearchBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
+    SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     SearchBox.TextScaled = false
     SearchBox.TextSize = 13
     SearchBox.Font = Enum.Font.Gotham
     SearchBox.ClearTextOnFocus = false
     SearchBox.Parent = parent
-    Corner(SearchBox, 6)
-    Stroke(SearchBox)
 
-    -- Create Buttons
+    CreateCorner(SearchBox, 6)
+    CreateStroke(SearchBox, Color3.fromRGB(60, 60, 75), 1)
+
+    -- Create Buttons for Each Pet
     for i, petName in ipairs(petList) do
         local PetButton = Instance.new("TextButton")
         PetButton.Name = "PetButton_" .. i
         PetButton.Size = UDim2.new(1, 0, 1, 0)
-        PetButton.BackgroundColor3 = Theme.Elevated
+        PetButton.BackgroundColor3 = Color3.fromRGB(50, 50, 62)
         PetButton.Text = petName
-        PetButton.TextColor3 = Theme.White
+        PetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
         PetButton.TextScaled = false
         PetButton.TextSize = 12
         PetButton.TextWrapped = true
         PetButton.Font = Enum.Font.GothamBold
         PetButton.AutoButtonColor = false
-        PetButton.LayoutOrder = i
         PetButton.Parent = ScrollingFrame
-        Corner(PetButton, 6)
-        Stroke(PetButton)
 
-        PetButton.MouseEnter:Connect(function()
-            if PetButton.BackgroundColor3 ~= Theme.Red and PetButton.BackgroundColor3 ~= Theme.Green then
-                Tween(PetButton, {BackgroundColor3 = Color3.fromRGB(65,65,75)}, 0.2)
-            end
-        end)
-        PetButton.MouseLeave:Connect(function()
-            if PetButton.BackgroundColor3 ~= Theme.Red and PetButton.BackgroundColor3 ~= Theme.Green then
-                Tween(PetButton, {BackgroundColor3 = Theme.Elevated}, 0.2)
-            end
-        end)
+        CreateCorner(PetButton, 4)
+        CreateStroke(PetButton, Color3.fromRGB(70, 70, 85), 1)
 
+        -- Toggle Functionality
         PetButton.MouseButton1Click:Connect(function()
-            local isRed = PetButton.BackgroundColor3 == Theme.Red
-            local target = isRed and Theme.Elevated or (isBlacklist and Theme.Red or Theme.Green)
-            local border = isRed and Theme.Border or (isBlacklist and Theme.Red or Theme.Green)
-            PetButton.BackgroundColor3 = target
-            local stroke = PetButton:FindFirstChild("UIStroke")
-            if stroke then stroke.Color = border end
+            local isRed = PetButton.BackgroundColor3 == Color3.fromRGB(237, 66, 69)
+            PetButton.BackgroundColor3 = isRed and Color3.fromRGB(50, 50, 62) or Color3.fromRGB(237, 66, 69)
+            PetButton:FindFirstChild("UIStroke").Color = isRed and Color3.fromRGB(70, 70, 85) or Color3.fromRGB(237, 66, 69)
             print("Toggled: " .. petName .. " in " .. (isBlacklist and "Blacklist" or "Auto-Force"))
         end)
     end
 
-    -- Search
+    -- Search Functionality
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local searchText = string.lower(SearchBox.Text)
         for _, child in ipairs(ScrollingFrame:GetChildren()) do
@@ -751,42 +687,41 @@ local function CreatePetList(parent, petList, isBlacklist)
         end
     end)
 
-    -- Bottom Buttons
+    -- Select All / Clear Buttons
     local SelectAllButton = Instance.new("TextButton")
-    SelectAllButton.Size = UDim2.new(0.45, -5, 0, 32)
-    SelectAllButton.Position = UDim2.new(0, 8, 1, -38)
-    SelectAllButton.BackgroundColor3 = Theme.Accent
+    SelectAllButton.Size = UDim2.new(0.45, -6, 0, 32)
+    SelectAllButton.Position = UDim2.new(0, 8, 1, -36)
+    SelectAllButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
     SelectAllButton.Text = "Select All"
-    SelectAllButton.TextColor3 = Theme.White
+    SelectAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     SelectAllButton.TextScaled = false
     SelectAllButton.TextSize = 13
     SelectAllButton.Font = Enum.Font.GothamBold
     SelectAllButton.AutoButtonColor = false
     SelectAllButton.Parent = parent
-    Corner(SelectAllButton, 6)
 
-    SelectAllButton.MouseEnter:Connect(function() Tween(SelectAllButton, {BackgroundColor3 = Theme.AccentLight}, 0.2) end)
-    SelectAllButton.MouseLeave:Connect(function() Tween(SelectAllButton, {BackgroundColor3 = Theme.Accent}, 0.2) end)
+    CreateCorner(SelectAllButton, 6)
 
     local ClearButton = Instance.new("TextButton")
-    ClearButton.Size = UDim2.new(0.45, -5, 0, 32)
-    ClearButton.Position = UDim2.new(0.55, 0, 1, -38)
-    ClearButton.BackgroundColor3 = Theme.Yellow
+    ClearButton.Size = UDim2.new(0.45, -6, 0, 32)
+    ClearButton.Position = UDim2.new(0.55, 0, 1, -36)
+    ClearButton.BackgroundColor3 = Color3.fromRGB(255, 120, 0)
     ClearButton.Text = "Clear"
-    ClearButton.TextColor3 = Color3.fromRGB(0,0,0)
+    ClearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     ClearButton.TextScaled = false
     ClearButton.TextSize = 13
     ClearButton.Font = Enum.Font.GothamBold
     ClearButton.AutoButtonColor = false
     ClearButton.Parent = parent
-    Corner(ClearButton, 6)
 
+    CreateCorner(ClearButton, 6)
+
+    -- Event Handlers for Select/Clear
     SelectAllButton.MouseButton1Click:Connect(function()
         for _, child in ipairs(ScrollingFrame:GetChildren()) do
             if child:IsA("TextButton") then
-                child.BackgroundColor3 = isBlacklist and Theme.Red or Theme.Green
-                local stroke = child:FindFirstChild("UIStroke")
-                if stroke then stroke.Color = child.BackgroundColor3 end
+                child.BackgroundColor3 = Color3.fromRGB(237, 66, 69)
+                child:FindFirstChild("UIStroke").Color = Color3.fromRGB(237, 66, 69)
             end
         end
     end)
@@ -794,47 +729,32 @@ local function CreatePetList(parent, petList, isBlacklist)
     ClearButton.MouseButton1Click:Connect(function()
         for _, child in ipairs(ScrollingFrame:GetChildren()) do
             if child:IsA("TextButton") then
-                child.BackgroundColor3 = Theme.Elevated
-                local stroke = child:FindFirstChild("UIStroke")
-                if stroke then stroke.Color = Theme.Border end
+                child.BackgroundColor3 = Color3.fromRGB(50, 50, 62)
+                child:FindFirstChild("UIStroke").Color = Color3.fromRGB(70, 70, 85)
             end
         end
     end)
 end
 
--- ============================================
--- MINI FRAME
--- ============================================
+-- Mini Frame (Quick Access)
 local function CreateMiniFrame()
-    if MiniFrame then return end
-
     MiniFrame = Instance.new("Frame")
     MiniFrame.Name = "MiniFrame"
-    MiniFrame.Size = UDim2.new(0, 140, 0, 48)
-    MiniFrame.Position = UDim2.new(0, 16, 1, -64)
-    MiniFrame.BackgroundColor3 = Theme.Accent
+    MiniFrame.Size = UDim2.new(0, 150, 0, 50)
+    MiniFrame.Position = UDim2.new(0, 10, 1, -60)
+    MiniFrame.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
     MiniFrame.BorderSizePixel = 0
     MiniFrame.Parent = ScreenGui
-    Corner(MiniFrame, 10)
-    Stroke(MiniFrame, Theme.AccentLight, 2)
 
-    local shadow = Instance.new("ImageLabel")
-    shadow.Size = UDim2.new(1, 20, 1, 20)
-    shadow.Position = UDim2.new(0, -10, 0, -10)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://5554236805"
-    shadow.ImageColor3 = Color3.fromRGB(0,0,0)
-    shadow.ImageTransparency = 0.5
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(23,23,277,277)
-    shadow.ZIndex = 0
-    shadow.Parent = MiniFrame
+    CreateCorner(MiniFrame, 10)
+    CreateGradient(MiniFrame, Color3.fromRGB(0, 100, 200), Color3.fromRGB(0, 150, 255))
+    CreateStroke(MiniFrame, Color3.fromRGB(255, 255, 255), 1)
 
     local MiniTitle = Instance.new("TextLabel")
     MiniTitle.Size = UDim2.new(1, 0, 0.5, 0)
     MiniTitle.BackgroundTransparency = 1
     MiniTitle.Text = "Ice Finder v49"
-    MiniTitle.TextColor3 = Theme.White
+    MiniTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
     MiniTitle.TextScaled = false
     MiniTitle.TextSize = 13
     MiniTitle.Font = Enum.Font.GothamBold
@@ -845,7 +765,7 @@ local function CreateMiniFrame()
     OpenButton.Position = UDim2.new(0, 0, 0.5, 0)
     OpenButton.BackgroundTransparency = 1
     OpenButton.Text = "Open UI"
-    OpenButton.TextColor3 = Theme.White
+    OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     OpenButton.TextScaled = false
     OpenButton.TextSize = 12
     OpenButton.Font = Enum.Font.Gotham
@@ -853,89 +773,58 @@ local function CreateMiniFrame()
 
     OpenButton.MouseButton1Click:Connect(function()
         MainFrame.Visible = true
-        Tween(MainFrame, {Size = UDim2.new(0, 520, 0, 420)}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-        MiniFrame.Visible = false
+        TweenObject(MainFrame, {Size = UDim2.new(0, 500, 0, 400)}, 0.5)
     end)
 
-    MakeDrag(MiniFrame)
+    MakeDraggable(MiniFrame)
 end
 
--- ============================================
--- LOG FUNCTION
--- ============================================
-function AddLog(message)
-    if not LogScrollingFrame or not LogScrollingFrame.Parent then return end
-
-    local LogEntry = Instance.new("Frame")
-    LogEntry.Size = UDim2.new(1, 0, 0, 0)
-    LogEntry.AutomaticSize = Enum.AutomaticSize.Y
+-- Log Function
+local function AddLog(message)
+    local LogEntry = Instance.new("TextLabel")
+    LogEntry.Size = UDim2.new(1, 0, 0, 20)
     LogEntry.BackgroundTransparency = 1
+    LogEntry.Text = os.date("%H:%M:%S") .. " - " .. message
+    LogEntry.TextColor3 = Color3.fromRGB(220, 220, 230)
+    LogEntry.TextScaled = false
+    LogEntry.TextSize = 13
+    LogEntry.Font = Enum.Font.Gotham
+    LogEntry.TextXAlignment = Enum.TextXAlignment.Left
     LogEntry.Parent = LogScrollingFrame
 
-    local timeLabel = Instance.new("TextLabel")
-    timeLabel.Size = UDim2.new(0, 50, 0, 18)
-    timeLabel.BackgroundTransparency = 1
-    timeLabel.Text = os.date("%H:%M:%S")
-    timeLabel.TextColor3 = Theme.DarkGray
-    timeLabel.TextScaled = false
-    timeLabel.TextSize = 11
-    timeLabel.Font = Enum.Font.Gotham
-    timeLabel.TextXAlignment = Enum.TextXAlignment.Left
-    timeLabel.Parent = LogEntry
+    -- Update Canvas Size
+    local layout = LogScrollingFrame:FindFirstChild("UIListLayout")
+    if layout then
+        LogScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+    end
 
-    local msgLabel = Instance.new("TextLabel")
-    msgLabel.Size = UDim2.new(1, -55, 0, 0)
-    msgLabel.AutomaticSize = Enum.AutomaticSize.Y
-    msgLabel.Position = UDim2.new(0, 55, 0, 0)
-    msgLabel.BackgroundTransparency = 1
-    msgLabel.Text = message
-    msgLabel.TextColor3 = Theme.White
-    msgLabel.TextScaled = false
-    msgLabel.TextSize = 13
-    msgLabel.Font = Enum.Font.Gotham
-    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
-    msgLabel.TextWrapped = true
-    msgLabel.Parent = LogEntry
-
-    local bounds = TextService:GetTextSize(message, 13, Enum.Font.Gotham, Vector2.new(LogScrollingFrame.AbsoluteSize.X - 75, 1000))
-    LogEntry.Size = UDim2.new(1, 0, 0, math.max(20, bounds.Y + 4))
-
-    delay(0.05, function()
-        if LogScrollingFrame and LogScrollingFrame.Parent then
-            LogScrollingFrame.CanvasPosition = Vector2.new(0, LogScrollingFrame.AbsoluteCanvasSize.Y)
-        end
-    end)
+    -- Auto-scroll to bottom
+    LogScrollingFrame.CanvasPosition = Vector2.new(0, LogScrollingFrame.AbsoluteCanvasSize.Y)
 end
 
--- ============================================
--- EVENTS
--- ============================================
+-- Main Frame Event Handlers
 local function SetupMainFrameEvents()
     if not MainFrame then return end
 
+    -- Close Button
     MainFrame.CloseButton.MouseButton1Click:Connect(function()
-        Tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-        wait(0.25)
-        if ScreenGui then ScreenGui:Destroy() end
+        ScreenGui:Destroy()
         ScreenGui = nil
     end)
 
+    -- Minimize Button
     MainFrame.MinimizeButton.MouseButton1Click:Connect(function()
-        Tween(MainFrame, {Size = UDim2.new(0, MainFrame.Size.X.Offset * 0.8, 0, 0)}, 0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-        wait(0.25)
         MainFrame.Visible = false
         if not MiniFrame then CreateMiniFrame() end
-        MiniFrame.Visible = true
     end)
 
+    -- Filter Button
     MainFrame.FilterButton.MouseButton1Click:Connect(function()
-        CreateFilterFrame()
+        if not FilterFrame then CreateFilterFrame() end
     end)
 end
 
--- ============================================
--- UPDATE LOOP
--- ============================================
+-- Update Loop for FPS/Ping and Effects
 local function StartUpdateLoop()
     local connection
     connection = RunService.RenderStepped:Connect(function()
@@ -944,48 +833,44 @@ local function StartUpdateLoop()
             return
         end
 
-        if OverlayStats and OverlayStats.Parent then
-            if ShowFPS then
-                local fps = UpdateFPS()
-                if fps then
-                    local lbl = OverlayStats:FindFirstChild("FPSLabel")
-                    if lbl then lbl.Text = "FPS: " .. fps end
-                end
+        -- Update FPS
+        if OverlayStats and ShowFPS then
+            local fps = UpdateFPS()
+            if fps > 0 then
+                OverlayStats.FPSLabel.Text = "FPS: " .. fps
             end
-            if ShowPing then
-                local ping = UpdatePing()
-                local lbl = OverlayStats:FindFirstChild("PingLabel")
-                if lbl then lbl.Text = "Ping: " .. ping .. "ms" end
-            end
+        end
+
+        -- Update Ping
+        if OverlayStats and ShowPing then
+            local ping = UpdatePing()
+            OverlayStats.PingLabel.Text = "Ping: " .. ping .. "ms"
         end
     end)
 end
 
--- ============================================
--- INPUT BINDING
--- ============================================
+-- Input Binding (Right Control to Toggle UI)
 local function SetupInputBinding()
     if not UIBindEnabled then return end
+
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.RightControl then
             if MainFrame then
                 MainFrame.Visible = not MainFrame.Visible
-                if MainFrame.Visible then
-                    Tween(MainFrame, {Size = UDim2.new(0, 520, 0, 420)}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-                end
             end
         end
     end)
 end
 
--- ============================================
--- PET SCANNING
--- ============================================
+-- Pet Scanning Logic (Simplified - original is more complex/offuscated)
 local function StartPetScanning()
+    -- This would scan for pets in the game, apply filters, etc.
+    -- For deobfuscation, here's a placeholder:
     spawn(function()
         while ScreenGui and ScreenGui.Parent do
-            wait(1)
+            wait(1)  -- Scan every second
+            -- Simulate finding a pet
             if math.random(1, 10) == 1 then
                 local randomPet = BlacklistPets[math.random(1, #BlacklistPets)]
                 local moneyValue = math.random(1, 1000)
@@ -997,6 +882,7 @@ local function StartPetScanning()
                         AddLog("Skipped: " .. randomPet .. " (Blacklisted)")
                     elseif ShowAutoForce and table.find(AutoForcePets, randomPet) then
                         AddLog("Auto-joining for: " .. randomPet)
+                        -- Teleport logic here (original uses ReplicatedStorage events)
                     end
                 end
             end
@@ -1004,96 +890,97 @@ local function StartPetScanning()
     end)
 end
 
--- ============================================
--- ANTI-LAG / ERROR
--- ============================================
+-- Anti-Lag / Error Handling (Placeholder)
 local function SetupAntiLag()
     if not AntiLag then return end
+    -- Reduce unnecessary loops, etc.
     print("Anti-Lag enabled")
 end
 
 local function SetupAntiError()
     if not AntiError then return end
-    local ok = pcall(function()
-        local old = getrawmetatable(game).__namecall
-        setreadonly(getrawmetatable(game), false)
-        getrawmetatable(game).__namecall = newcclosure(function(self, ...)
-            local ok2, res = pcall(old, self, ...)
-            if not ok2 then warn("Error caught: " .. tostring(res)) end
-            return res
-        end)
-        setreadonly(getrawmetatable(game), true)
+    -- Wrap critical functions in pcall
+    local oldNamecall = getrawmetatable(game).__namecall
+    setreadonly(getrawmetatable(game), false)
+    getrawmetatable(game).__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+        local success, result = pcall(oldNamecall, self, ...)
+        if not success then
+            warn("Error caught: " .. tostring(result))
+        end
+        return result
     end)
-    if ok then print("Anti-Error enabled") end
+    setreadonly(getrawmetatable(game), true)
 end
 
--- ============================================
--- INITIALIZATION
--- ============================================
+-- Initialization
 local function Initialize()
     CreateMainGUI()
     SetupMainFrameEvents()
     StartUpdateLoop()
     SetupInputBinding()
 
-    -- Blacklist Frame
+    -- Create Blacklist Frame (example - attach to a subframe if needed)
     local BlacklistFrame = Instance.new("Frame")
     BlacklistFrame.Name = "BlacklistFrame"
-    BlacklistFrame.Size = UDim2.new(0, 360, 0, 300)
-    BlacklistFrame.Position = UDim2.new(0.5, 270, 0.5, -150)
-    BlacklistFrame.BackgroundColor3 = Theme.BG
+    BlacklistFrame.Size = UDim2.new(0, 400, 0, 300)
+    BlacklistFrame.Position = UDim2.new(1, 10, 0.5, -150)
+    BlacklistFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
     BlacklistFrame.BorderSizePixel = 0
     BlacklistFrame.Parent = ScreenGui
     BlacklistFrame.Visible = false
     BlacklistFrame.ZIndex = 5
-    Corner(BlacklistFrame, 12)
-    Stroke(BlacklistFrame)
+
+    CreateCorner(BlacklistFrame, 12)
+    CreateStroke(BlacklistFrame, Color3.fromRGB(60, 60, 75), 1)
 
     local blTitle = Instance.new("TextLabel")
     blTitle.Size = UDim2.new(1, 0, 0, 28)
     blTitle.BackgroundTransparency = 1
     blTitle.Text = "Blacklist"
-    blTitle.TextColor3 = Theme.Red
+    blTitle.TextColor3 = Color3.fromRGB(237, 66, 69)
     blTitle.TextScaled = false
-    blTitle.TextSize = 16
+    blTitle.TextSize = 15
     blTitle.Font = Enum.Font.GothamBold
     blTitle.Parent = BlacklistFrame
 
     CreatePetList(BlacklistFrame, BlacklistPets, true)
 
-    -- Auto-Force Frame
+    -- Similarly for Auto-Force
     local AutoForceFrame = Instance.new("Frame")
     AutoForceFrame.Name = "AutoForceFrame"
-    AutoForceFrame.Size = UDim2.new(0, 360, 0, 300)
-    AutoForceFrame.Position = UDim2.new(0.5, 270, 0.5, 170)
-    AutoForceFrame.BackgroundColor3 = Theme.BG
+    AutoForceFrame.Size = UDim2.new(0, 400, 0, 300)
+    AutoForceFrame.Position = UDim2.new(1, 420, 0.5, -150)
+    AutoForceFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
     AutoForceFrame.BorderSizePixel = 0
     AutoForceFrame.Parent = ScreenGui
     AutoForceFrame.Visible = false
     AutoForceFrame.ZIndex = 5
-    Corner(AutoForceFrame, 12)
-    Stroke(AutoForceFrame)
+
+    CreateCorner(AutoForceFrame, 12)
+    CreateStroke(AutoForceFrame, Color3.fromRGB(60, 60, 75), 1)
 
     local afTitle = Instance.new("TextLabel")
     afTitle.Size = UDim2.new(1, 0, 0, 28)
     afTitle.BackgroundTransparency = 1
     afTitle.Text = "Auto-Force"
-    afTitle.TextColor3 = Theme.Green
+    afTitle.TextColor3 = Color3.fromRGB(59, 165, 93)
     afTitle.TextScaled = false
-    afTitle.TextSize = 16
+    afTitle.TextSize = 15
     afTitle.Font = Enum.Font.GothamBold
     afTitle.Parent = AutoForceFrame
 
     CreatePetList(AutoForceFrame, AutoForcePets, false)
 
-    -- Start
+    -- Start Features
     StartPetScanning()
     if AntiLag then SetupAntiLag() end
     if AntiError then SetupAntiError() end
 
     AddLog("loaded")
 
-    -- Save Config
+    -- Save Config (placeholder - original saves to json but doesn't load)
     local config = {
         MinMoney = MinMoney,
         ShowBlacklist = ShowBlacklist,
@@ -1105,15 +992,16 @@ local function Initialize()
         ShowFPS = ShowFPS,
         ShowPing = ShowPing
     }
+    local json = HttpService:JSONEncode(config)
     pcall(function()
-        writefile("IceFinder_v49_Clean.json", HttpService:JSONEncode(config))
+        writefile("IceFinder_v49_PerfectVisuals.json", json)
     end)
 end
 
--- Run
+-- Run Initialization
 Initialize()
 
--- Cleanup
+-- Cleanup on script end
 game:BindToClose(function()
     if ScreenGui then ScreenGui:Destroy() end
 end)
